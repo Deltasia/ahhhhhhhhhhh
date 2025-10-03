@@ -1,0 +1,8 @@
+flask==2.3.2
+flask-socketio==5.3.4
+eventlet==0.33.0
+opencv-python>=4.8.0
+numpy==1.26.4
+pillow==10.3.0
+ultralytics
+torch

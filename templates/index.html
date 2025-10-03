@@ -1,0 +1,326 @@
+<!-- <!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>YOLO Realtime Webcam</title>
+  <style>
+    body { font-family: Arial, sans-serif; display:flex; gap:20px; padding:20px; }
+    video, img { width: 640px; height: 480px; background: #222; }
+    #controls { display:flex; flex-direction:column; gap:8px; }
+  </style>
+</head>
+<body>
+  <div>
+    <h3>Local webcam (sending frames)</h3>
+    <video id="video" autoplay playsinline></video>
+    <div>FPS send: <span id="sendFps">-</span></div>
+  </div>
+
+  <div id="controls">
+    <h3>Server annotated</h3>
+    <img id="annotated" alt="annotated frame" />
+    <div>Server FPS: <span id="serverFps">-</span></div>
+    <label>Confidence threshold: <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.25"></label>
+    <button id="startBtn">Start</button>
+    <button id="stopBtn">Stop</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"
+    integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+   <script src="/static/main.js"></script> -->
+<!-- </body>
+</html>  -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime YOLO Webcam</title>
+  <style>
+    :root {
+      color-scheme: dark light;
+    }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .panel {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 16px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.35);
+      padding: 24px;
+      flex: 1 1 320px;
+      min-width: 300px;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+
+    #video-stream {
+      display: block;
+      width: 100%;
+      max-width: 640px;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      row-gap: 8px;
+      column-gap: 16px;
+      font-size: 0.95rem;
+    }
+
+    dt {
+      color: #94a3b8;
+    }
+
+    dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(14, 165, 233, 0.25);
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      font-size: 0.9rem;
+      background: rgba(30, 41, 59, 0.6);
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: rgba(226, 232, 240, 0.7);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .error {
+      margin-top: 12px;
+      color: #f87171;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="panel">
+      <h1>Realtime YOLO Object Detection</h1>
+      <img id="video-stream" src="{{ url_for('video') }}" alt="Video stream">
+      <div id="calibration-status" class="status">Loading camera status…</div>
+    </section>
+
+    <section class="panel">
+      <h2>Measurement dashboard</h2>
+      <dl>
+        <dt>Latest distance</dt>
+        <dd id="latest-distance">–</dd>
+        <dt>Latest angle</dt>
+        <dd id="latest-angle">–</dd>
+        <dt>Vertical angle</dt>
+        <dd id="latest-vertical-angle">–</dd>
+        <dt>Reference distance</dt>
+        <dd id="reference-distance">–</dd>
+        <dt>Reference angle</dt>
+        <dd id="reference-angle">–</dd>
+        <dt>Δ distance</dt>
+        <dd id="delta-distance">–</dd>
+        <dt>Δ angle</dt>
+        <dd id="delta-angle">–</dd>
+        <dt>Lateral shift</dt>
+        <dd id="delta-x">–</dd>
+        <dt>Forward shift</dt>
+        <dd id="delta-z">–</dd>
+      </dl>
+
+      <div class="btn-row">
+        <button id="btn-set-reference" type="button">Set reference</button>
+        <button id="btn-clear-reference" type="button" class="secondary">Clear reference</button>
+      </div>
+
+      <div id="error" class="error" role="alert" aria-live="polite"></div>
+
+      <p class="hint">
+        Point the camera at your target, wait for a detection, then press “Set reference”.
+        The dashboard will track how far the object moves relative to that reference point.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const formatNumber = (value, unit = 'cm') => {
+      if (value === null || value === undefined) return '–';
+      const num = Number(value);
+      if (Number.isNaN(num)) return '–';
+      return `${num.toFixed(1)} ${unit}`;
+    };
+
+    const statusEl = document.getElementById('calibration-status');
+    const latestDistanceEl = document.getElementById('latest-distance');
+    const latestAngleEl = document.getElementById('latest-angle');
+    const latestVerticalEl = document.getElementById('latest-vertical-angle');
+    const refDistanceEl = document.getElementById('reference-distance');
+    const refAngleEl = document.getElementById('reference-angle');
+    const deltaDistanceEl = document.getElementById('delta-distance');
+    const deltaAngleEl = document.getElementById('delta-angle');
+    const deltaXEl = document.getElementById('delta-x');
+    const deltaZEl = document.getElementById('delta-z');
+    const errorEl = document.getElementById('error');
+    const btnSet = document.getElementById('btn-set-reference');
+    const btnClear = document.getElementById('btn-clear-reference');
+
+    let pollingHandle = null;
+
+    const updateDashboard = (data) => {
+      const { latest, reference, offsets, calibrated } = data;
+
+      statusEl.textContent = calibrated
+        ? 'Camera intrinsics loaded — measurements use calibrated focal length.'
+        : 'Calibration file not found. Using fallback focal length, expect less accuracy.';
+
+      if (latest) {
+        latestDistanceEl.textContent = formatNumber(latest.distance_cm);
+        latestAngleEl.textContent = formatNumber(latest.angle_deg, '°');
+        latestVerticalEl.textContent = formatNumber(latest.vertical_angle_deg, '°');
+      } else {
+        latestDistanceEl.textContent = '–';
+        latestAngleEl.textContent = '–';
+        latestVerticalEl.textContent = '–';
+      }
+
+      if (reference) {
+        refDistanceEl.textContent = formatNumber(reference.distance_cm);
+        refAngleEl.textContent = formatNumber(reference.angle_deg, '°');
+      } else {
+        refDistanceEl.textContent = '–';
+        refAngleEl.textContent = '–';
+      }
+
+      if (offsets) {
+        deltaDistanceEl.textContent = formatNumber(offsets.delta_distance_cm);
+        deltaAngleEl.textContent = formatNumber(offsets.delta_angle_deg, '°');
+        deltaXEl.textContent = formatNumber(offsets.delta_x_cm);
+        deltaZEl.textContent = formatNumber(offsets.delta_z_cm);
+      } else {
+        deltaDistanceEl.textContent = '–';
+        deltaAngleEl.textContent = '–';
+        deltaXEl.textContent = '–';
+        deltaZEl.textContent = '–';
+      }
+    };
+
+    const pollState = async () => {
+      try {
+        const response = await fetch('/api/state');
+        if (!response.ok) throw new Error('Failed to fetch state');
+        const data = await response.json();
+        updateDashboard(data);
+        errorEl.textContent = '';
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    };
+
+    const setReference = async () => {
+      btnSet.disabled = true;
+      errorEl.textContent = '';
+      try {
+        const response = await fetch('/api/reference', { method: 'POST' });
+        if (!response.ok) {
+          const payload = await response.json();
+          throw new Error(payload.message || 'Unable to set reference');
+        }
+      } catch (err) {
+        errorEl.textContent = err.message;
+      } finally {
+        btnSet.disabled = false;
+      }
+    };
+
+    const clearReference = async () => {
+      btnClear.disabled = true;
+      errorEl.textContent = '';
+      try {
+        await fetch('/api/reference', { method: 'DELETE' });
+      } catch (err) {
+        errorEl.textContent = err.message;
+      } finally {
+        btnClear.disabled = false;
+      }
+    };
+
+    btnSet.addEventListener('click', setReference);
+    btnClear.addEventListener('click', clearReference);
+
+    pollState();
+    pollingHandle = setInterval(pollState, 1);
+
+    window.addEventListener('beforeunload', () => {
+      if (pollingHandle) {
+        clearInterval(pollingHandle);
+      }
+    });
+  </script>
+</body>
+</html>
