@@ -2,6 +2,29 @@
 
 This project streams live frames from a webcam, performs object detection with Ultralytics YOLO, and annotates the feed with distance and angle measurements. A reference pose can be captured to track how far the object moves relative to that point. Camera intrinsics are loaded from `calibration_data.npz` when available, improving the accuracy of the angular and distance estimates.
 
+## Camera Selection
+
+The web interface includes a camera selection dropdown that automatically detects all available cameras on your system. You can switch between cameras without restarting the application.
+
+### Features
+
+- **Auto-detection**: Automatically enumerates all available cameras on startup
+- **Real-time switching**: Switch between cameras without restarting the app
+- **Cross-platform**: Works on Windows, macOS, and Linux with appropriate backends
+- **Visual feedback**: Shows loading states and error messages when switching cameras
+- **Performance optimized**: Camera enumeration is cached for 30 seconds to reduce detection overhead
+- **Smart enumeration**: Stops searching after 3 consecutive camera index failures
+
+### Testing Camera Detection
+
+To see what cameras are available on your system, run:
+
+```powershell
+python test_camera_enumeration.py
+```
+
+This will list all detected cameras with their indices and backend information.
+
 ## Prerequisites
 
 - Windows 10/11
@@ -31,9 +54,23 @@ python app.py
 
 Open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser. The dashboard shows:
 
+- **Camera Source** – dropdown to select from available cameras
 - **Latest distance/angles** – real-time measurements for the highest-confidence detection.
 - **Reference** – the stored baseline measurement.
 - **Δ values** – displacement relative to the reference (lateral and forward components).
+
+### Using Camera Selection
+
+1. Open the web interface in your browser
+2. Use the **Camera Source** dropdown to see all available cameras
+3. Select a different camera to switch the video feed
+4. Use the refresh button (🔄) next to the dropdown to re-scan for cameras
+5. The interface will show loading feedback while switching cameras
+
+**Performance Notes:**
+- Camera detection is cached for 30 seconds to improve responsiveness
+- The first camera enumeration may take 2-3 seconds, subsequent calls are nearly instant
+- Use the refresh button if you connect/disconnect cameras
 
 ### Capturing a reference point
 
@@ -104,7 +141,15 @@ Leave out `PRINCIPAL_POINT_X/Y` if the optical center is close to the frame midp
 ## Troubleshooting
 
 - **No detection / blank stream**: Ensure the webcam is not in use by another application and that YOLO weights exist.
+- **No cameras in dropdown**: Run `python test_camera_enumeration.py` to verify camera detection. Ensure cameras are properly connected and not in use by other applications.
+- **Camera switching fails**: Some cameras may not support hot-swapping. Try disconnecting/reconnecting the camera or restarting the application.
 - **Measurements stuck at fallback**: Double-check that `calibration_data.npz` is in the project root and readable.
 - **Large distance errors**: Confirm that the physical width (`KNOWN_WIDTH_CM`) matches the object, and re-run calibration with more diverse checkerboard poses.
+
+### Camera-specific Issues
+
+- **macOS**: The first camera access may require permission. Grant camera access in System Preferences > Security & Privacy.
+- **Linux**: Ensure your user is in the `video` group: `sudo usermod -a -G video $USER`
+- **Windows**: Some cameras may require specific DirectShow drivers for optimal performance.
 
 Happy building! Capture a reference, watch the delta values update in real time, and iterate on your tracking logic as needed.

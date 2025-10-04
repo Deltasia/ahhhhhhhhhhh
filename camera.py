@@ -2,15 +2,105 @@ import os
 import cv2
 import numpy as np
 import platform
+import time
 from config import Config
 
+# Global cache for camera enumeration
+_camera_cache = None
+_cache_timestamp = 0
+_cache_duration = 30  # Cache for 30 seconds
+
+def enumerate_cameras(max_cameras=10, use_cache=True):
+    """Enumerate available cameras and return their indices and names."""
+    global _camera_cache, _cache_timestamp
+    
+    # Check if we should use cached result
+    if use_cache and _camera_cache is not None:
+        if time.time() - _cache_timestamp < _cache_duration:
+            return _camera_cache
+    
+    available_cameras = []
+    system = platform.system()
+    
+    # Define backends based on operating system
+    if system == "Darwin":  # macOS
+        backends = [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
+    elif system == "Windows":
+        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_VFW]
+    elif system == "Linux":
+        backends = [cv2.CAP_V4L2, cv2.CAP_GSTREAMER, cv2.CAP_ANY]
+    else:
+        backends = [cv2.CAP_ANY]
+    
+    consecutive_failures = 0
+    max_consecutive_failures = 3
+    
+    for idx in range(max_cameras):
+        camera_found = False
+        for backend in backends:
+            try:
+                cap = cv2.VideoCapture(idx, backend)
+                if cap.isOpened():
+                    # Test if we can actually read from the camera
+                    ret, _ = cap.read()
+                    if ret:
+                        # Try to get camera name/description
+                        camera_name = f"Camera {idx}"
+                        try:
+                            # Some backends support getting device name
+                            if hasattr(cap, 'getBackendName'):
+                                backend_name = cap.getBackendName()
+                                camera_name = f"Camera {idx} ({backend_name})"
+                        except Exception:
+                            pass
+                        
+                        available_cameras.append({
+                            'index': idx,
+                            'name': camera_name,
+                            'backend': backend
+                        })
+                        cap.release()
+                        camera_found = True
+                        consecutive_failures = 0
+                        break  # Found working camera with this index, move to next
+                cap.release()
+            except Exception:
+                # Continue trying other backends
+                continue
+        
+        # If no camera found at this index, increment failure counter
+        if not camera_found:
+            consecutive_failures += 1
+            # Stop searching if we've had too many consecutive failures
+            if consecutive_failures >= max_consecutive_failures:
+                break
+    
+    # Cache the result
+    if use_cache:
+        _camera_cache = available_cameras
+        _cache_timestamp = time.time()
+    
+    return available_cameras
+
+def clear_camera_cache():
+    """Clear the camera enumeration cache."""
+    global _camera_cache, _cache_timestamp
+    _camera_cache = None
+    _cache_timestamp = 0
+
 class Camera:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, camera_index=0):
         self.config = config
-        self.cap = self.get_camera_safe()
+        self.camera_index = camera_index
+        self.cap = None
+        self.cap = self.get_camera_safe(preferred_index=camera_index)
         self.camera_matrix, self.dist_coeffs = self.load_calibration()
         self.principal_point = self.calculate_principal_point()
         self.focal_length_px = self.calculate_focal_length()
+    
+    def __del__(self):
+        """Cleanup when object is destroyed."""
+        self.release()
 
     def get_camera_safe(self, preferred_index=0, fallback_index=0, width=640, height=480):
         # Define backends based on operating system
@@ -50,6 +140,21 @@ class Camera:
                     continue
 
         raise RuntimeError("ไม่สามารถเปิดกล้องได้ทั้ง preferred และ fallback index")
+    
+    def switch_camera(self, new_index):
+        """Switch to a different camera index."""
+        if self.cap:
+            self.cap.release()
+            self.cap = None
+        
+        self.camera_index = new_index
+        self.cap = self.get_camera_safe(preferred_index=new_index)
+        
+        # Clear camera cache after successful switch
+        if self.cap is not None:
+            clear_camera_cache()
+        
+        return self.cap is not None
 
     def load_calibration(self):
         path = self.config.CALIBRATION_PATH
@@ -95,3 +200,4 @@ class Camera:
     def release(self):
         if self.cap:
             self.cap.release()
+            self.cap = None

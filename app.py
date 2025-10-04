@@ -1,8 +1,10 @@
 from flask import Flask, Response, jsonify, render_template, request
 from flask_socketio import SocketIO
+import signal
+import sys
 
 from config import Config
-from camera import Camera
+from camera import Camera, enumerate_cameras, clear_camera_cache
 from model import Model
 from measurement import MeasurementService
 from video_stream import VideoStreamer
@@ -55,6 +57,59 @@ def api_reference():
     if not success:
         return message, 400
     return "", 200
+
+@app.route('/api/cameras')
+def api_cameras():
+    """Get list of available cameras."""
+    cameras = enumerate_cameras()
+    current_camera = getattr(camera, 'camera_index', 0)
+    return jsonify({
+        'cameras': cameras,
+        'current': current_camera
+    })
+
+@app.route('/api/camera/switch', methods=['POST'])
+def api_switch_camera():
+    """Switch to a different camera."""
+    data = request.get_json()
+    if not data or 'index' not in data:
+        return jsonify({'error': 'Camera index required'}), 400
+    
+    try:
+        camera_index = int(data['index'])
+        success = camera.switch_camera(camera_index)
+        if success:
+            # Clear cache after successful switch so next enumeration is fresh
+            clear_camera_cache()
+            return jsonify({'message': f'Switched to camera {camera_index}'}), 200
+        else:
+            return jsonify({'error': f'Failed to switch to camera {camera_index}'}), 400
+    except ValueError:
+        return jsonify({'error': 'Invalid camera index'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/cameras/refresh', methods=['POST'])
+def api_refresh_cameras():
+    """Force refresh of camera list by clearing cache."""
+    clear_camera_cache()
+    cameras = enumerate_cameras(use_cache=False)
+    current_camera = getattr(camera, 'camera_index', 0)
+    return jsonify({
+        'cameras': cameras,
+        'current': current_camera,
+        'message': 'Camera list refreshed'
+    })
+
+def signal_handler(sig, frame):
+    """Handle shutdown signals for proper cleanup."""
+    print(f"\nReceived signal {sig}, shutting down gracefully...")
+    camera.release()
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 if __name__ == "__main__":
     try:

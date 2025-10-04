@@ -163,12 +163,100 @@
       color: #f87171;
       font-size: 0.9rem;
     }
+
+    .camera-selector {
+      margin-bottom: 16px;
+    }
+
+    .camera-selector label {
+      display: block;
+      margin-bottom: 8px;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .camera-selector select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(30, 41, 59, 0.6);
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+      background-position: right 10px center;
+      background-repeat: no-repeat;
+      background-size: 16px;
+      padding-right: 40px;
+    }
+
+    .camera-selector select:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+    }
+
+    .camera-selector select:hover {
+      border-color: rgba(148, 163, 184, 0.5);
+    }
+
+    .camera-selector select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .camera-status {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+    }
+
+    .camera-status.loading {
+      background: rgba(251, 191, 36, 0.1);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.2);
+    }
+
+    .camera-status.success {
+      background: rgba(34, 197, 94, 0.1);
+      color: #22c55e;
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .camera-status.error {
+      background: rgba(248, 113, 113, 0.1);
+      color: #f87171;
+      border: 1px solid rgba(248, 113, 113, 0.2);
+    }
+
+    .camera-status.hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <section class="panel">
       <h1>Realtime YOLO Object Detection</h1>
+      
+      <div class="camera-selector">
+        <label for="camera-select">Camera Source:</label>
+        <div style="display: flex; gap: 8px; align-items: flex-end;">
+          <select id="camera-select" style="flex: 1;">
+            <option value="">Loading cameras...</option>
+          </select>
+          <button id="refresh-cameras" type="button" style="padding: 8px 12px; font-size: 0.8rem; min-width: auto;">
+            🔄
+          </button>
+        </div>
+        <div id="camera-status" class="camera-status hidden"></div>
+      </div>
+      
       <img id="video-stream" src="{{ url_for('video') }}" alt="Video stream">
       <div id="calibration-status" class="status">Loading camera status…</div>
     </section>
@@ -225,6 +313,163 @@
       logsDiv.innerHTML += '<pre style="margin: 0; padding: 4px 0;">' + data.replace(/\n/g, '<br>') + '</pre>';
       logsDiv.scrollTop = logsDiv.scrollHeight;
     });
+
+    // Camera selection functionality
+    async function loadCameras() {
+      try {
+        const response = await fetch('/api/cameras');
+        const data = await response.json();
+        const select = document.getElementById('camera-select');
+        
+        select.innerHTML = '';
+        
+        if (data.cameras && data.cameras.length > 0) {
+          data.cameras.forEach(camera => {
+            const option = document.createElement('option');
+            option.value = camera.index;
+            option.textContent = camera.name;
+            if (camera.index === data.current) {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+        } else {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No cameras found';
+          option.disabled = true;
+          select.appendChild(option);
+        }
+      } catch (error) {
+        console.error('Failed to load cameras:', error);
+        const select = document.getElementById('camera-select');
+        select.innerHTML = '<option value="" disabled>Error loading cameras</option>';
+      }
+    }
+
+    function showCameraStatus(message, type) {
+      const statusEl = document.getElementById('camera-status');
+      statusEl.textContent = message;
+      statusEl.className = `camera-status ${type}`;
+    }
+
+    function hideCameraStatus() {
+      const statusEl = document.getElementById('camera-status');
+      statusEl.className = 'camera-status hidden';
+    }
+
+    async function refreshCameras() {
+      const refreshBtn = document.getElementById('refresh-cameras');
+      const select = document.getElementById('camera-select');
+      
+      try {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = '⏳';
+        showCameraStatus('Refreshing camera list...', 'loading');
+        
+        const response = await fetch('/api/cameras/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          select.innerHTML = '';
+          
+          if (data.cameras && data.cameras.length > 0) {
+            data.cameras.forEach(camera => {
+              const option = document.createElement('option');
+              option.value = camera.index;
+              option.textContent = camera.name;
+              if (camera.index === data.current) {
+                option.selected = true;
+              }
+              select.appendChild(option);
+            });
+            showCameraStatus('Camera list refreshed', 'success');
+          } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No cameras found';
+            option.disabled = true;
+            select.appendChild(option);
+            showCameraStatus('No cameras found', 'error');
+          }
+          
+          setTimeout(hideCameraStatus, 3000);
+        } else {
+          showCameraStatus('Failed to refresh camera list', 'error');
+        }
+      } catch (error) {
+        console.error('Error refreshing cameras:', error);
+        showCameraStatus('Error refreshing cameras', 'error');
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '🔄';
+      }
+    }
+
+    async function switchCamera(index) {
+      const select = document.getElementById('camera-select');
+      
+      try {
+        // Show loading state
+        select.disabled = true;
+        showCameraStatus('Switching camera...', 'loading');
+        
+        const response = await fetch('/api/camera/switch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ index: parseInt(index) })
+        });
+        
+        if (response.ok) {
+          // Reload the video stream by updating the src attribute
+          const videoStream = document.getElementById('video-stream');
+          const timestamp = new Date().getTime();
+          videoStream.src = `/video?t=${timestamp}`;
+          
+          const data = await response.json();
+          console.log('Camera switched:', data.message);
+          showCameraStatus('Camera switched successfully', 'success');
+          
+          // Hide success message after 3 seconds
+          setTimeout(hideCameraStatus, 3000);
+        } else {
+          const error = await response.json();
+          console.error('Failed to switch camera:', error.error);
+          showCameraStatus(`Failed to switch camera: ${error.error}`, 'error');
+          
+          // Reset select to previous value
+          await loadCameras();
+        }
+      } catch (error) {
+        console.error('Error switching camera:', error);
+        showCameraStatus(`Error switching camera: ${error.message}`, 'error');
+        
+        // Reset select to previous value
+        await loadCameras();
+      } finally {
+        select.disabled = false;
+      }
+    }
+
+    // Event listeners
+    document.getElementById('camera-select').addEventListener('change', function(e) {
+      if (e.target.value) {
+        switchCamera(e.target.value);
+      }
+    });
+
+    document.getElementById('refresh-cameras').addEventListener('click', refreshCameras);
+
+    // Load cameras on page load
+    document.addEventListener('DOMContentLoaded', loadCameras);
   </script>
 </body>
 </html>
