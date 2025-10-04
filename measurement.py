@@ -74,8 +74,9 @@ class MeasurementService:
         obj_center_x = (x1 + x2) / 2.0
         obj_center_y = (y1 + y2) / 2.0
         obj_width_px = max((x2 - x1), 1e-6)
-
-        distance_cm = (self.camera.config.KNOWN_WIDTH_CM * self.camera.focal_length_px) / obj_width_px
+        
+        # distance_cm = ((self.camera.config.KNOWN_WIDTH_CM * self.camera.focal_length_px) / obj_width_px) 
+        distance_cm = (0.714*(self.camera.config.KNOWN_WIDTH_CM * self.camera.focal_length_px) / obj_width_px)-3.571
 
         cx, cy = self.camera.principal_point
         angle_rad = math.atan2(obj_center_x - cx, self.camera.focal_length_px)
