@@ -11,3 +11,4 @@ class Config:
         self.manual_focal = os.getenv("FOCAL_LENGTH_PX")
         self.manual_pp_x = os.getenv("PRINCIPAL_POINT_X")
         self.manual_pp_y = os.getenv("PRINCIPAL_POINT_Y")
+        self.MAX_INFERENCE_FPS = float(os.getenv("MAX_INFERENCE_FPS", "10.0"))
