@@ -5,6 +5,23 @@ import requests
 import threading
 import time
 
+import matplotlib.pyplot as plt
+
+class PID:
+    def __init__(self, Kp=0.5, Ki=0.0, Kd=0.1):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.prev_error = 0
+        self.integral = 0
+
+    def compute(self, error, dt=0.1):
+        self.integral += error * dt
+        derivative = (error - self.prev_error) / dt
+        output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+        self.prev_error = error
+        return output
+
 class YoloRobotController(Node):
     def __init__(self, yolo_api_url="http://localhost:8080/api/state"):
         super().__init__('yolo_robot_controller')
@@ -14,6 +31,9 @@ class YoloRobotController(Node):
         self.mode = "keyboard"  # default: keyboard, can toggle to 'auto'
         self.mode_lock = threading.Lock()
         self.running = True
+
+        self.pid = PID(Kp=0.5, Ki=0.0, Kd=0.1)
+        self.error_history = []
 
         # Thread สำหรับ loop autonomous
         self.auto_thread = threading.Thread(target=self.autonomous_loop, daemon=True)
@@ -63,23 +83,44 @@ class YoloRobotController(Node):
         obj_center_x = measurement["center"]["x"]
         distance_cm = measurement["distance_cm"]
 
-        # ----------ปรับค่า logic เพิ่มด้วย---------
-        if distance_cm > 50: 
-            if obj_center_x < frame_center - 50:
-                return ord('a')
-            elif obj_center_x > frame_center + 50:
-                return ord('d')
-            else:
-                return ord('w') 
-        elif distance_cm < 20:
-            return ord('s') 
+        # คำนวณ error และ PID
+        error = obj_center_x - frame_center
+        self.error_history.append(error)
+        pid_output = self.pid.compute(error)
+
+        # แปลงค่า PID output เป็น key code
+        if abs(error) < 10:
+            move = 'w' if distance_cm > 20 else 's' 
+        elif pid_output > 0:
+            move = 'd'  # เลี้ยวขวา
         else:
-            return None
-        # ----------ปรับค่า logic เพิ่มด้วย---------
+            move = 'a'  # เลี้ยวซ้าย
+
+        return ord(move)
+
+        # # ----------ปรับค่า logic เพิ่มด้วย---------
+        # if distance_cm > 50: 
+        #     if obj_center_x < frame_center - 50:
+        #         return ord('a')
+        #     elif obj_center_x > frame_center + 50:
+        #         return ord('d')
+        #     else:
+        #         return ord('w') 
+        # elif distance_cm < 20:
+        #     return ord('s') 
+        # else:
+        #     return None
+        # # ----------ปรับค่า logic เพิ่มด้วย---------
 
     def shutdown(self):
         self.running = False
         self.auto_thread.join()
+        if self.error_history:
+            plt.plot(self.error_history)
+            plt.xlabel("Time step")
+            plt.ylabel("PID error (pixels)")
+            plt.title("PID error over time (oscillation)")
+            plt.show()
 
 
 def main(args=None):
