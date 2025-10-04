@@ -15,7 +15,7 @@ imgpoints = []
 
 # ของโจ้(image_dir) fx=1483.96, fy=1487.91 (pixel units)
 # ของพี่(calib_imagess) fx=1386.81, fy=1381.46 (pixel units)
-image_dir = r"C:\Users\Asus\OneDrive\Documents\GitHub\ahhhhhhhhhhh\calib_images"
+image_dir = "calib_images"
 images = glob.glob(os.path.join(image_dir, "*.jpg"))
 
 print(f"Found {len(images)} images")
@@ -58,3 +58,7 @@ cx, cy = mtx[0,2], mtx[1,2]
 
 print(f"Focal length: fx={fx:.2f}, fy={fy:.2f} (pixel units)")
 print(f"Principal point: ({cx:.2f}, {cy:.2f})")
+
+# Save calibration data to npz file
+np.savez('calibration_data.npz', camera_matrix=mtx, dist_coeffs=dist)
+print("Calibration data saved to calibration_data.npz")
