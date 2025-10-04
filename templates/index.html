@@ -37,6 +37,7 @@
   <meta charset="UTF-8">
   <title>Realtime YOLO Webcam</title>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     :root {
       color-scheme: dark light;
@@ -210,6 +211,20 @@
         The dashboard will track how far the object moves relative to that reference point.
       </p>
     </section>
+
+    <section class="panel">
+      <h2>Detection Logs</h2>
+      <div id="logs" style="max-height: 300px; overflow-y: auto; background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.8rem;"></div>
+    </section>
   </div>
+
+  <script>
+    const socket = io();
+    socket.on('log', (data) => {
+      const logsDiv = document.getElementById('logs');
+      logsDiv.innerHTML += '<pre style="margin: 0; padding: 4px 0;">' + data.replace(/\n/g, '<br>') + '</pre>';
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+    });
+  </script>
 </body>
 </html>

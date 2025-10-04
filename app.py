@@ -12,10 +12,10 @@ config = Config()
 camera = Camera(config)
 model = Model(config)
 measurement_service = MeasurementService(camera, model)
-video_streamer = VideoStreamer(camera, model, measurement_service)
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+video_streamer = VideoStreamer(camera, model, measurement_service, socketio)
 
 @app.route('/')
 def index():

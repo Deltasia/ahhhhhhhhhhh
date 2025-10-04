@@ -1,13 +1,15 @@
 import cv2
+from collections import Counter
 from camera import Camera
 from model import Model
 from measurement import MeasurementService
 
 class VideoStreamer:
-    def __init__(self, camera: Camera, model: Model, measurement_service: MeasurementService):
+    def __init__(self, camera: Camera, model: Model, measurement_service: MeasurementService, socketio):
         self.camera = camera
         self.model = model
         self.measurement_service = measurement_service
+        self.socketio = socketio
 
     def gen_frames(self):
         while True:
@@ -19,7 +21,25 @@ class VideoStreamer:
                 frame = cv2.undistort(frame, self.camera.camera_matrix, self.camera.dist_coeffs)
 
             frame_h = frame.shape[0]
-            results = self.model.model(frame, imgsz=640)[0]
+
+            results = self.model.model(frame, imgsz=640, verbose=False)[0]
+
+            # Construct log string manually
+            h, w = frame.shape[:2]
+            if results.boxes is None or len(results.boxes) == 0:
+                det_str = "(no detections)"
+            else:
+                cls_counts = Counter(int(box.cls[0]) for box in results.boxes)
+                det_parts = []
+                for cls, count in cls_counts.items():
+                    name = self.model.model.names[cls]
+                    det_parts.append(f"{count} {name}")
+                det_str = " ".join(det_parts)
+
+            speed = results.speed
+            log = (f"0: {w}x{h} {det_str}, {speed['inference']:.1f}ms\n"
+                   f"Speed: {speed['preprocess']:.1f}ms preprocess, {speed['inference']:.1f}ms inference, {speed['postprocess']:.1f}ms postprocess per image at shape (1, 3, {h}, {w})")
+            self.socketio.emit('log', log)
 
             best_detection = None
 
