@@ -255,6 +255,15 @@ def gen_frames():
 def index():
     return render_template('index.html')
 
+@app.route('/dashboard')
+def dashboard():
+    with measurement_lock:
+        latest = latest_measurement.copy() if latest_measurement else None
+        reference = reference_measurement.copy() if reference_measurement else None
+        offsets = compute_offsets(latest, reference) if latest and reference else None
+
+    return render_template('dashboard.html', calibrated=camera_matrix is not None, latest=latest, reference=reference, offsets=offsets)
+
 @app.route('/video')
 def video():
     return Response(gen_frames(),
@@ -286,19 +295,13 @@ def api_reference():
     with measurement_lock:
         if request.method == 'POST':
             if not latest_measurement:
-                return jsonify({
-                    "status": "error",
-                    "message": "No detection available to store as reference."
-                }), 400
+                return "No detection available to store as reference.", 400
 
             reference_measurement = latest_measurement.copy()
-            return jsonify({
-                "status": "ok",
-                "reference": reference_measurement,
-            })
+            return "", 200
 
         reference_measurement = None
-        return jsonify({"status": "ok", "message": "Reference cleared."})
+        return "", 200
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=PORT, debug=False)

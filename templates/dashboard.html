@@ -1,0 +1,28 @@
+<div id="calibration-status" class="status">
+  {% if calibrated %}
+    Camera intrinsics loaded — measurements use calibrated focal length.
+  {% else %}
+    Calibration file not found. Using fallback focal length, expect less accuracy.
+  {% endif %}
+</div>
+
+<dl>
+  <dt>Latest distance</dt>
+  <dd>{% if latest %}{{ "%.1f"|format(latest.distance_cm) }} cm{% else %}–{% endif %}</dd>
+  <dt>Latest angle</dt>
+  <dd>{% if latest %}{{ "%.1f"|format(latest.angle_deg) }} °{% else %}–{% endif %}</dd>
+  <dt>Vertical angle</dt>
+  <dd>{% if latest %}{{ "%.1f"|format(latest.vertical_angle_deg) }} °{% else %}–{% endif %}</dd>
+  <dt>Reference distance</dt>
+  <dd>{% if reference %}{{ "%.1f"|format(reference.distance_cm) }} cm{% else %}–{% endif %}</dd>
+  <dt>Reference angle</dt>
+  <dd>{% if reference %}{{ "%.1f"|format(reference.angle_deg) }} °{% else %}–{% endif %}</dd>
+  <dt>Δ distance</dt>
+  <dd>{% if offsets %}{{ "%.1f"|format(offsets.delta_distance_cm) }} cm{% else %}–{% endif %}</dd>
+  <dt>Δ angle</dt>
+  <dd>{% if offsets %}{{ "%.1f"|format(offsets.delta_angle_deg) }} °{% else %}–{% endif %}</dd>
+  <dt>Lateral shift</dt>
+  <dd>{% if offsets %}{{ "%.1f"|format(offsets.delta_x_cm) }} cm{% else %}–{% endif %}</dd>
+  <dt>Forward shift</dt>
+  <dd>{% if offsets %}{{ "%.1f"|format(offsets.delta_z_cm) }} cm{% else %}–{% endif %}</dd>
+</dl>
