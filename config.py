@@ -12,3 +12,4 @@ class Config:
         self.manual_pp_x = os.getenv("PRINCIPAL_POINT_X")
         self.manual_pp_y = os.getenv("PRINCIPAL_POINT_Y")
         self.MAX_INFERENCE_FPS = float(os.getenv("MAX_INFERENCE_FPS", "10.0"))
+        self.MAX_FPS = float(os.getenv("MAX_FPS", "30.0"))

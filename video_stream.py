@@ -16,6 +16,7 @@ class VideoStreamer:
 
     def gen_frames(self):
         while True:
+            start_time = time.time()
             ret, frame = self.camera.cap.read()
             if not ret:
                 continue
@@ -112,3 +113,6 @@ class VideoStreamer:
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            elapsed = time.time() - start_time
+            sleep_time = max(0, 1 / self.config.MAX_FPS - elapsed)
+            time.sleep(sleep_time)
