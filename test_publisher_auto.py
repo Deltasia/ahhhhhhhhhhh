@@ -6,11 +6,7 @@ import threading
 import time
 
 class YoloRobotController(Node):
-    """
-    Node สำหรับรับข้อมูลจาก YOLO API Flask
-    และสั่งหุ่นยนต์ด้วย key code
-    """
-    def __init__(self, yolo_api_url="http://localhost:5000/api/state"):
+    def __init__(self, yolo_api_url="http://localhost:8080/api/state"):
         super().__init__('yolo_robot_controller')
         self.publisher_ = self.create_publisher(Int32, 'keyboard', 10)
         self.yolo_api_url = yolo_api_url
@@ -48,7 +44,6 @@ class YoloRobotController(Node):
                     time.sleep(0.1)
                     continue
 
-                # ตัดสินใจ movement ตามตำแหน่ง object
                 key_code = self.decide_movement(latest)
                 if key_code:
                     msg = Int32()
@@ -62,14 +57,11 @@ class YoloRobotController(Node):
                 time.sleep(0.2)
 
     def decide_movement(self, measurement):
-        """
-        ตัดสินใจ movement จาก YOLO measurement
-        คืนค่าเป็น key code ที่เหมือนกับ keyboard
-        """
+        if measurement is None or measurement.get("distance_cm") is None:
+            return ord('a')
         frame_center = 320  # เฟรมเราตั้งกว้าง 640
         obj_center_x = measurement["center"]["x"]
         distance_cm = measurement["distance_cm"]
-
 
         # ----------ปรับค่า logic เพิ่มด้วย---------
         if distance_cm > 50: 
@@ -95,7 +87,6 @@ def main(args=None):
     controller = YoloRobotController()
 
     try:
-        # รับ input จากคีย์บอร์ดเพื่อสลับ mode
         print("Press 't' + Enter to toggle mode (keyboard/auto). Ctrl+C to exit.")
         while rclpy.ok():
             rclpy.spin_once(controller, timeout_sec=0.1)
